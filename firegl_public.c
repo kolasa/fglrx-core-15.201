@@ -93,7 +93,7 @@
    and they use different config options. These options can only be enabled
    on x86_64 with newer 2.6 kernels (2.6.23 for intel, 2.6.26 for amd). 
 */
-#if defined(CONFIG_AMD_IOMMU) || defined(CONFIG_DMAR)
+#if defined(CONFIG_AMD_IOMMU) || defined(CONFIG_INTEL_IOMMU) || defined(CONFIG_DMAR)
     #define FIREGL_DMA_REMAPPING
 #endif
 
@@ -191,9 +191,17 @@
 #include <linux/string.h>
 #include <linux/gfp.h>
 #include <linux/swap.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+#include <asm/fpu/api.h>
+#else
 #include "asm/i387.h"
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+#include <asm/fpu/internal.h>
+#else
 #include <asm/fpu-internal.h>
+#endif
 #endif
 
 #include "firegl_public.h"
@@ -623,7 +631,12 @@ static int firegl_major_proc_read(struct seq_file *m, void* data)
 
     len = snprintf(buf, request, "%d\n", major);
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+    seq_printf(m, "%d\n", major);
+    len = 0;
+#else
     len = seq_printf(m, "%d\n", major);
+#endif
 #endif
 
     KCL_DEBUG1(FN_FIREGL_PROC, "return len=%i\n",len);
@@ -1706,6 +1719,9 @@ void ATI_API_CALL KCL_SetCurrentProcessState(KCL_ENUM_ProcessState state)
 
 #if defined(__i386__) 
 #ifndef __HAVE_ARCH_CMPXCHG
+#ifndef __xg
+#define __xg(x) ((volatile long *)(x))
+#endif
 static inline 
 unsigned long __fgl_cmpxchg(volatile void *ptr, unsigned long old,            
                         unsigned long new, int size)                      
@@ -1742,7 +1758,11 @@ unsigned long ATI_API_CALL kcl__cmpxchg(volatile void *ptr, unsigned long old,
          unsigned long new, int size)
 {
 #ifndef __HAVE_ARCH_CMPXCHG
-    return __fgl_cmpxchg(ptr,old,new,size);
+#if defined(__i386__)
+     return __fgl_cmpxchg(ptr,old,new,size);
+#elif defined(__x86_64__)
+    return cmpxchg((unsigned long*)ptr,old,new);
+#endif
 #else
     /* On kernel version 2.6.34 passing a variable or unsupported size
      * argument to the __cmpxchg macro causes the default-clause of a
@@ -3506,7 +3526,11 @@ int ATI_API_CALL KCL_InstallInterruptHandler(
 #else
         //when MSI enabled. keep irq disabled when calling the action handler,
         //exclude this IRQ from irq balancing (only on one CPU) 
-        ((useMSI) ? (IRQF_DISABLED) : (IRQF_SHARED)),    
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
+        ((useMSI) ? (IRQF_DISABLED) : (IRQF_SHARED)),
+#else
+        ((useMSI) ? (0x0) : (IRQF_SHARED)),
+#endif
 #endif
         dev_name,
         context);
@@ -6430,27 +6454,42 @@ void ATI_API_CALL KCL_create_uuid(void *buf)
     generate_random_uuid((char *)buf);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0) && LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
 static int KCL_fpu_save_init(struct task_struct *tsk)
 {
    struct fpu *fpu = &tsk->thread.fpu;
 
    if(static_cpu_has(X86_FEATURE_XSAVE)) {
-      fpu_xsave(fpu);
-      if (!(fpu->state->xsave.xsave_hdr.xstate_bv & XSTATE_FP))
-	 return 1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+       fpu_xsave(fpu);
+       if (!(fpu->state->xsave.xsave_hdr.xstate_bv & XSTATE_FP))
+#else
+      copy_xregs_to_kernel(&fpu->state.xsave);
+      if (!(fpu->state.xsave.header.xfeatures & XSTATE_FP))
+#endif
+	return 1;
    } else if (static_cpu_has(X86_FEATURE_FXSR)) {
-	 fpu_fxsave(fpu);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+         fpu_fxsave(fpu);
+#else
+     copy_fxregs_to_kernel(fpu);
+#endif
    } else {
-	 asm volatile("fnsave %[fx]; fwait"
+	asm volatile("fnsave %[fx]; fwait"
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
                   : [fx] "=m" (fpu->state->fsave));
-	 return 0;
+#else
+                  : [fx] "=m" (fpu->state.fsave));
+#endif
+	return 0;
    }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
    if (unlikely(fpu->state->fxsave.swd & X87_FSW_ES)) {
 	asm volatile("fnclex");
 	return 0;
    }
+#endif
    return 1;
 }
 #endif
@@ -6462,7 +6501,11 @@ static int KCL_fpu_save_init(struct task_struct *tsk)
 void ATI_API_CALL KCL_fpu_begin(void)
 {
 #ifdef CONFIG_X86_64
-    kernel_fpu_begin();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+     kernel_fpu_begin();
+#else
+    __kernel_fpu_begin();
+#endif
 #else
 #ifdef TS_USEDFPU
     struct thread_info *cur_thread = current_thread_info();
@@ -6487,7 +6530,12 @@ void ATI_API_CALL KCL_fpu_begin(void)
     /* The thread structure is changed with the commit below for kernel 3.3:
      * https://github.com/torvalds/linux/commit/7e16838d94b566a17b65231073d179bc04d590c8
      */
-    if (cur_task->thread.fpu.has_fpu)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+	if (cur_task->thread.fpu.fpregs_active)
+#else
+	if (cur_task->thread.fpu.has_fpu)
+#endif
+
 #else
     if (cur_task->thread.has_fpu)
 #endif
@@ -6508,7 +6556,11 @@ void ATI_API_CALL KCL_fpu_begin(void)
  */
 void ATI_API_CALL KCL_fpu_end(void)
 {
-    kernel_fpu_end();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+     kernel_fpu_end();
+#else
+    __kernel_fpu_end();
+#endif
 }
 
 /** Create new directory entry under "/proc/...."

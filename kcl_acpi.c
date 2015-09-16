@@ -836,6 +836,7 @@ KCL_ACPI_DevHandle ATI_API_CALL KCL_ACPI_GetAlternateHandle(KCL_ACPI_DevHandle p
     return retHandle;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
 static acpi_status KCL_ACPI_Slot_No_Hotplug(KCL_ACPI_DevHandle handle, u32 lvl, void *data, void **rv)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,7) && LINUX_VERSION_CODE < KERNEL_VERSION(3,17,0)
@@ -855,6 +856,7 @@ static acpi_status KCL_ACPI_Slot_No_Hotplug(KCL_ACPI_DevHandle handle, u32 lvl, 
 #endif
    return 0;
 }
+#endif
 
 void ATI_API_CALL KCL_ACPI_No_Hotplug(void* dev)
 {

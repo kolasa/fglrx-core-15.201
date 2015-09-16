@@ -57,7 +57,7 @@ set_GCC_version () {
 
 if [ -z "${CC}" ]; then 
 	CC=gcc
-	set_GCC_version
+#	set_GCC_version
 fi
 
 # ==============================================================

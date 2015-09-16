@@ -169,7 +169,11 @@ int ATI_API_CALL KCL_STR_Strnicmp(const char* s1,
                                   const char* s2,
                                   KCL_TYPE_SizeSigned count)
 {
-    return strnicmp(s1, s2, count);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0)
+     return strnicmp(s1, s2, count);
+#else
+    return strncasecmp(s1, s2, count);
+#endif
 }
 
 /** \brief Locate character in string
