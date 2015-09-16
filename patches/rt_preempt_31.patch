@@ -1,0 +1,36 @@
+--- build_mod/firegl_public.c.orig	2009-10-13 23:26:53.583314294 +0200
++++ build_mod/firegl_public.c	2009-10-13 23:28:41.639335726 +0200
+@@ -135,6 +135,9 @@
+ #endif
+ #include <asm/delay.h>
+ #include <linux/agp_backend.h>
++#ifdef CONFIG_PREEMPT_RT
++#include <linux/semaphore.h>
++#endif
+ 
+ #ifndef EXPORT_NO_SYMBOLS
+ #define EXPORT_NO_SYMBOLS
+@@ -1025,7 +1028,11 @@ static int __init firegl_init_module(voi
+     dev->pubdev.signature = FGL_DEVICE_SIGNATURE;
+ 
+     for (i = 0; i < __KE_MAX_SPINLOCKS; i++)
++#if !defined (CONFIG_PREEMPT_RT)
+         dev->spinlock[i] = SPIN_LOCK_UNLOCKED;
++#else
++        spin_lock_init(&dev->spinlock[i]);
++#endif
+ 
+     for (i=0; i < __KE_MAX_SEMAPHORES; i++)
+         sema_init(&dev->struct_sem[i], 1);
+@@ -4998,7 +5005,11 @@ unsigned int ATI_API_CALL KAS_Mutex_GetO
+ unsigned int ATI_API_CALL KAS_Mutex_Initialize(void* hMutex)
+ {
+     kasMutex_t* mutex_obj = (kasMutex_t*)hMutex;
++#if !defined (CONFIG_PREEMPT_RT)
+     init_MUTEX(&(mutex_obj->mutex));
++#else
++    semaphore_init(&(mutex_obj->mutex));
++#endif
+     return 1;
+ }
+ 
