@@ -6454,7 +6454,7 @@ void ATI_API_CALL KCL_create_uuid(void *buf)
     generate_random_uuid((char *)buf);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0) && LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)
 static int KCL_fpu_save_init(struct task_struct *tsk)
 {
    struct fpu *fpu = &tsk->thread.fpu;
