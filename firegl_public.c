@@ -6515,7 +6515,11 @@ void ATI_API_CALL KCL_fpu_begin(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)
          KCL_fpu_save_init(cur_task);
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+         fpu_save_init(&cur_task->thread.fpu);
+#else
          __save_init_fpu(cur_task);
+#endif
 #endif
     else
          clts();
@@ -6542,7 +6546,11 @@ void ATI_API_CALL KCL_fpu_begin(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)
         KCL_fpu_save_init(cur_task);
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+        fpu_save_init(&cur_task->thread.fpu);
+#else
         __save_init_fpu(cur_task);
+#endif
 #endif
     else
          clts();
