@@ -136,6 +136,9 @@
 #include <asm/processor.h>
 #include <asm/tlbflush.h> // for flush_tlb_page
 #include <asm/cpufeature.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+#undef CONFIG_MTRR
+#endif
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
