@@ -136,8 +136,10 @@
 #include <asm/processor.h>
 #include <asm/tlbflush.h> // for flush_tlb_page
 #include <asm/cpufeature.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0) 
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
+#endif
 #endif
 #ifdef CONFIG_EFI
 #include <linux/efi.h>
@@ -3418,6 +3420,7 @@ void ATI_API_CALL KCL_PageCache_Flush(void)
 
 int ATI_API_CALL KCL_MEM_MTRR_Support(void)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0) 
 #ifdef CONFIG_MTRR
 #ifdef FIREGL_USWC_SUPPORT
     return ((kcl_mem_pat_status == KCL_MEM_PAT_DISABLED) ? 1 : 0);
@@ -3427,24 +3430,35 @@ int ATI_API_CALL KCL_MEM_MTRR_Support(void)
 #else /* !CONFIG_MTRR */
     return 0;
 #endif /* !CONFIG_MTRR */
+#else /* KERNEL >= 4.3 */
+    return 0;
+#endif /* KERNEL >= 4.3 */    
 }
 
 int ATI_API_CALL KCL_MEM_MTRR_AddRegionWc(unsigned long base, unsigned long size)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0) 
 #ifdef CONFIG_MTRR
     return mtrr_add(base, size, MTRR_TYPE_WRCOMB, 1);
 #else /* !CONFIG_MTRR */
     return -EPERM;
 #endif /* !CONFIG_MTRR */
+#else /* KERNEL >= 4.3 */
+    return -EPERM;
+#endif /* KERNEL >= 4.3 */    
 }
 
 int ATI_API_CALL KCL_MEM_MTRR_DeleteRegion(int reg, unsigned long base, unsigned long size)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0) 
 #ifdef CONFIG_MTRR
     return mtrr_del(reg, base, size);
 #else /* !CONFIG_MTRR */
     return -EPERM;
 #endif /* !CONFIG_MTRR */
+#else /* KERNEL >= 4.3 */
+    return -EPERM;
+#endif /* KERNEL >= 4.3 */    
 }
 
 // UEFI specific support
