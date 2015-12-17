@@ -6468,7 +6468,11 @@ static int KCL_fpu_save_init(struct task_struct *tsk)
        if (!(fpu->state->xsave.xsave_hdr.xstate_bv & XSTATE_FP))
 #else
       copy_xregs_to_kernel(&fpu->state.xsave);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
+      if (!(fpu->state.xsave.header.xfeatures & XFEATURE_MASK_FP))
+#else
       if (!(fpu->state.xsave.header.xfeatures & XSTATE_FP))
+#endif
 #endif
 	return 1;
    } else if (static_cpu_has(X86_FEATURE_FXSR)) {
